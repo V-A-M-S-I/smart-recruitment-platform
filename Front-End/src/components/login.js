@@ -46,6 +46,7 @@ export default function Login() {
     const provider = new GoogleAuthProvider();
     try {
       const result = await signInWithPopup(auth, provider);
+      navigate('/home');
       console.log('Google authentication successful:', result.user);
     } catch (error) {
       console.error('Error with Google authentication:', error.message);

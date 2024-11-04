@@ -1,25 +1,44 @@
 import express from 'express';
 import bodyParser from 'body-parser';
 import mongoose from 'mongoose';
+import axios from 'axios';
 import cors from 'cors';
-import bcrypt from 'bcrypt'; // Import bcrypt
-import crypto from 'crypto'; // Import crypto for generating tokens
-import nodemailer from 'nodemailer'; // Import nodemailer for sending emails
-import User from './Schemas/signupSchema.js'; // Import your User schema
+import bcrypt, { compareSync } from 'bcrypt'; 
+import crypto from 'crypto'; 
+import nodemailer from 'nodemailer'; 
+import multer from 'multer'; 
+import fs from 'fs';
+import path from 'path';
+import { PDFExtract } from 'pdf.js-extract';
+import { fileURLToPath } from 'url'; 
+import User from './Schemas/signupSchema.js'; 
+import Job from './Schemas/jobcreationSchema.js';
+import Applicant from './Schemas/applicationSchema.js';
+import Admin from './Schemas/adminloginSchema.js';
+import { GoogleGenerativeAI } from '@google/generative-ai';
+
+// Create __dirname in ES module environment
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 
+// Body-parser middleware
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+// Set view engine
 app.set('view engine', 'ejs');
 
-mongoose.connect('mongodb+srv://v23enkatavamsi0206:2VDlwefJX7oYljYX@cluster0.ofr5e.mongodb.net/Smart-Recruitment-Platform?retryWrites=true&w=majority', {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
+// Connect to MongoDB
+mongoose.connect('mongodb+srv://venkatavamsi0206:2VDlwefJX7oYljYX@cluster0.ofr5e.mongodb.net/Smart-Recruitment-Platform?retryWrites=true&w=majority', {
+
 })
   .then(() => console.log('Connected to the database'))
   .catch((err) => console.log('Error connecting to the database:', err));
 
+// Enable CORS
 app.use(cors({ origin: 'http://localhost:3000' }));
 
 // Configure the nodemailer transporter
@@ -27,9 +46,151 @@ const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
     user: 'venkatavamsi0206@gmail.com',  // Replace with your email
-    pass: 'ucsm iola fuqi nfxias',   // Replace with your email password or app-specific password
+    pass: 'ucsm iola fuqi nfxi',   // Replace with your app-specific password
   },
 });
+
+// Multer configuration for file uploads
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const dirPath = path.join(__dirname, 'uploads', 'resumes');
+    
+    // Ensure the directory exists
+    fs.mkdirSync(dirPath, { recursive: true });
+    
+    cb(null, dirPath);  // Save files in 'uploads/resumes' directory
+  },
+  filename: (req, file, cb) => {
+    cb(null, Date.now() + '-' + file.originalname);
+  },
+});
+
+const upload = multer({ storage });
+
+// Apply Job Route
+app.post('/applyjob/:id', upload.single('resume'), async (req, res) => {
+  const {
+    firstname, lastname, email, phone, department, qualification,
+    institute, graduationYear, skills, workExperience,
+  } = req.body;
+
+  if (!req.file) {
+    return res.status(400).json({ message: 'Resume file is required' });
+  }
+
+  const jobId = req.params.id;
+
+  if (!mongoose.Types.ObjectId.isValid(jobId)) {
+    return res.status(400).json({ message: 'Invalid Job ID format' });
+  }
+
+  try {
+    const jobExists = await Job.findById(jobId);
+    if (!jobExists) {
+      return res.status(404).json({ message: 'Job not found' });
+    }
+
+    const resumePath = path.join(__dirname, 'uploads', 'resumes', req.file.filename);
+    const pdfExtract = new PDFExtract();
+    const options = {};
+
+    pdfExtract.extract(resumePath, options, async (err, data) => {
+      if (err) {
+        console.error('Error extracting PDF text:', err);
+        return res.status(500).json({ message: 'Error processing resume file', error: err.message });
+      }
+
+      const extractedText = data.pages.map(page => page.content.map(item => item.str).join(' ')).join('\n');
+      const jobSpecifications = {
+        title: jobExists.title,
+        description: jobExists.jobDescription,
+        requirements: jobExists.requiredQualification,
+      };
+
+      try {
+        const genAI = new GoogleGenerativeAI("AIzaSyC8SzSsUp1uo4zSz8OfUCLyBr1YE0O1A2k");
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+
+        const prompt = `
+        Resume: ${extractedText}
+
+        Job Title: ${jobSpecifications.title}
+        Job Description: ${jobSpecifications.description}
+        Requirements: ${jobSpecifications.requirements}
+
+        Provide feedback comparing the resume to the job description.
+        `;
+
+        const requestData = {
+            inputs: [
+                {
+                    prompt: prompt,
+                    max_tokens: 150,  // Adjust as needed
+                    temperature: 0.7, // Adjust for variability
+                }
+            ]
+        };
+
+        const result = await model.generateContent(requestData);
+
+        const newApplicant = new Applicant({
+          firstname, lastname, email, phone, department, qualification,
+          institute, graduationYear, skills, workExperience,
+          resume: `http://localhost:8080/uploads/resumes/${req.file.filename}`,
+          jobId: mongoose.Types.ObjectId(jobId),
+          feedback: feedback,
+        });
+
+        await newApplicant.save();
+        res.status(201).json({ message: 'Application submitted successfully', feedback: feedback });
+      } catch (geminiError) {
+        console.error('Error communicating with Gemini API:', geminiError);
+        res.status(500).json({ message: 'Error processing resume against job specifications', error: geminiError.message });
+      }
+    });
+  } catch (err) {
+    console.error('Error applying for job:', err);
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+app.get('/applicants/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Check if `id` is a valid ObjectId
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: 'Invalid job ID format' });
+    }
+
+    const objectId = new mongoose.Types.ObjectId(id);
+    const applicants = await Applicant.find({ jobId: objectId });
+
+    if (!applicants.length) {
+      return res.status(404).json({ message: 'No applicants found for this job ID' });
+    }
+
+    res.status(200).json(applicants);
+  } catch (err) {
+    console.error('Error fetching applicants:', err);
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
+
 
 // Reset Password Request (Forgot Password)
 app.post('/forgot-password', async (req, res) => {
@@ -43,7 +204,7 @@ app.post('/forgot-password', async (req, res) => {
 
     // Generate a password reset token
     const token = crypto.randomBytes(20).toString('hex');
-
+    
     // Set token and expiry time
     user.resetPasswordToken = token;
     user.resetPasswordExpires = Date.now() + 3600000; // 1 hour
@@ -181,6 +342,153 @@ app.post('/login', async (req, res) => {
   }
 });
 
+
+app.post('/adminlogin', async (req, res) => {
+  const { email, password } = req.body;
+
+  try {
+    
+    const admin = await Admin.findOne({ email });
+    if (!admin) {
+      return res.status(404).json({ message: 'Admin not found' });
+    }
+
+    // Check if password matches
+    if (admin.password !== password) {
+      return res.status(400).json({ message: 'Invalid credentials' });
+    }
+
+    res.json({ message: 'Login successful' });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+app.post('/jobcreation', async (req, res) => {  // Switch the order of req, res
+  const {
+    name,
+    title,
+    location,
+    salary,
+    jobDescription,
+    department,
+    employmentType, 
+    requiredQualification,
+    jobResponsibilities,
+    applicationDeadline
+  } = req.body;
+
+  try {
+    const existingCompany = await Job.findOne({ name });
+    if (existingCompany) {
+      return res.status(400).json({ message: 'Company has already created a job listing' });
+    }
+
+    const newJob = new Job({
+      name,
+      title,
+      location,
+      salary,
+      jobDescription,
+      department,
+      employmentType, 
+      requiredQualification,
+      jobResponsibilities,
+      applicationDeadline
+    });
+
+    await newJob.save();
+    res.status(201).json({ message: 'Job creation successful', newJob });  
+  } catch (err) {
+    console.error('Error creating job:', err);
+    res.status(500).json({ message: 'Server error', error: err.message });  
+  }
+});
+
+
+app.get('/jobcreation', async (req, res) => {
+  try {
+    const jobs = await Job.find(); 
+    res.status(200).json(jobs); 
+  } catch (err) {
+    console.error('Error fetching jobs:', err);
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
+
+app.get('/jobcreation/:id', async (req, res) => {
+  try {
+    const job = await Job.findById(req.params.id); // Fetch job by ID
+    if (!job) {
+      return res.status(404).json({ message: 'Job not found' });
+    }
+    res.status(200).json(job); 
+  } catch (err) {
+    console.error('Error fetching job:', err);
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
+app.delete('/jobcreation/:id', async (req, res) => {
+  try {
+    const job = await Job.findByIdAndDelete(req.params.id);
+    if (!job) {
+      return res.status(404).json({ message: 'Job not found' });
+    }
+    res.status(200).json({ message: 'Job deleted successfully' });
+  } catch (err) {
+    console.error('Error deleting job:', err);
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
+
+// PUT (Update) Job
+app.put('/jobcreation/:id', async (req, res) => {
+  const {
+    name,
+    title,
+    location,
+    salary,
+    jobDescription,
+    department,
+    employmentType,
+    requiredQualification,
+    jobResponsibilities,
+    applicationDeadline
+  } = req.body;
+
+  try {
+    // Find the job by ID and update it with the new data
+    const updatedJob = await Job.findByIdAndUpdate(
+      req.params.id,
+      {
+        name,
+        title,
+        location,
+        salary,
+        jobDescription,
+        department,
+        employmentType,
+        requiredQualification,
+        jobResponsibilities,
+        applicationDeadline
+      },
+      { new: true } 
+    );
+
+    // If no job is found with the given ID
+    if (!updatedJob) {
+      return res.status(404).json({ message: 'Job not found' });
+    }
+
+    res.status(200).json({ message: 'Job updated successfully', updatedJob });
+  } catch (err) {
+    console.error('Error updating job:', err);
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
 
 
 app.listen(8080, () => {

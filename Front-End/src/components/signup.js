@@ -16,6 +16,7 @@ export default function Signup() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const navigate = useNavigate();
+  
   const handleChange = (e) => {
     const { name, value } = e.target;
     setSignupData({
@@ -110,7 +111,7 @@ export default function Signup() {
       <hr />
             
       <button onClick={handleGoogleAuth}>Sign Up with Google</button><br></br>
-      <Link to="/">Already have an account? Log in</Link>
+      <Link to="/login">Already have an account? Log in</Link>
     </div>
   );
 }

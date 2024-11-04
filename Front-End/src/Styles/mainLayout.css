@@ -1,0 +1,36 @@
+/* src/Styles/mainLayout.css */
+
+.main-layout {
+  position: relative; /* Create a positioning context */
+  height: 100vh; /* Full height of the viewport */
+  overflow: hidden; /* Hide any overflow */
+}
+
+img {
+  width: 100%;
+  height: 75%; /* Set height to 75% for both images */
+  object-fit: cover; /* Maintain aspect ratio while covering */
+}
+
+.services {
+  position: absolute; 
+  color: black; 
+  text-align: center; 
+  padding: 1rem; 
+  font-size: large; /* Fixed typo: should be font-size */
+  top: 10%; /* Position the services section */
+}
+
+/* This rule applies to the job image specifically, ensuring it matches the main layout image */
+.job {
+  /* Same styling as the default img */
+  width: 100%;
+  height: 75%;
+  object-fit: cover;
+  position: relative; /* Ensure it follows normal flow */
+}
+
+/* Optionally, to ensure the job image has some separation */
+.job {
+  margin-top: 1rem; /* Add some margin if needed */
+}
