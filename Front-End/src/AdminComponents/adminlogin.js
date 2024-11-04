@@ -28,7 +28,7 @@ export default function Adminogin() {
       console.log(response);
       setSuccess(response.data.message);
       setError('');
-      navigate('/jobslist');
+      navigate('/jobcreation');
       // Reset form fields
       setLoginData({
         email: '',

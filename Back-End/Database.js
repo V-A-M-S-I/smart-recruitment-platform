@@ -90,6 +90,9 @@ app.post('/applyjob/:id', upload.single('resume'), async (req, res) => {
       return res.status(404).json({ message: 'Job not found' });
     }
 
+    // Extract job details
+    const { title, description, requiredQualification, responsibilities } = jobExists;
+
     const resumePath = path.join(__dirname, 'uploads', 'resumes', req.file.filename);
     const pdfExtract = new PDFExtract();
     const options = {};
@@ -101,59 +104,63 @@ app.post('/applyjob/:id', upload.single('resume'), async (req, res) => {
       }
 
       const extractedText = data.pages.map(page => page.content.map(item => item.str).join(' ')).join('\n');
-      const jobSpecifications = {
-        title: jobExists.title,
-        description: jobExists.jobDescription,
-        requirements: jobExists.requiredQualification,
-      };
+
+      // Construct the prompt with both resume content and job details
+      const prompt = `
+         compare and give  resume content, and the job details,and provide feeback whether applicant is suitable for the job are not give output as Eligible/NotEligible and resons for elible r not most important thing is consider every applicnat as fresher he does not requiure any exprirnce  :
+        
+        **Resume Content:**
+        "${extractedText}"
+        
+        **Job Title:**
+        "${title}"
+
+        **Job Description:**
+        "${description}"
+
+        **Required Qualifications:**
+        "${requiredQualification}"
+
+        **Job Responsibilities:**
+        "${responsibilities}"
+      `;
+
+      // Pass the prompt to the Gemini API
+      const genAI = new GoogleGenerativeAI("AIzaSyC8SzSsUp1uo4zSz8OfUCLyBr1YE0O1A2k"); // replace with your actual API key
+      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
       try {
-        const genAI = new GoogleGenerativeAI("AIzaSyC8SzSsUp1uo4zSz8OfUCLyBr1YE0O1A2k");
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        const response = await model.generateContent(prompt);
+        
+        // Log the entire response for debugging
+        console.log('Gemini API response:', JSON.stringify(response, null, 2));
 
-        const prompt = `
-        Resume: ${extractedText}
-
-        Job Title: ${jobSpecifications.title}
-        Job Description: ${jobSpecifications.description}
-        Requirements: ${jobSpecifications.requirements}
-
-        Provide feedback comparing the resume to the job description.
-        `;
-
-        const requestData = {
-            inputs: [
-                {
-                    prompt: prompt,
-                    max_tokens: 150,  // Adjust as needed
-                    temperature: 0.7, // Adjust for variability
-                }
-            ]
-        };
-
-        const result = await model.generateContent(requestData);
-
+        // Extract the feedback text from the response
+        const feedbackText = response.response.candidates[0].content.parts[0].text;
+        console.log(feedbackText);
+        
+        // Save applicant with the feedback received
         const newApplicant = new Applicant({
           firstname, lastname, email, phone, department, qualification,
           institute, graduationYear, skills, workExperience,
           resume: `http://localhost:8080/uploads/resumes/${req.file.filename}`,
-          jobId: mongoose.Types.ObjectId(jobId),
-          feedback: feedback,
+          jobId: new mongoose.Types.ObjectId(jobId),
+          feedback: feedbackText, // Use the feedback text from the API
         });
 
         await newApplicant.save();
-        res.status(201).json({ message: 'Application submitted successfully', feedback: feedback });
-      } catch (geminiError) {
-        console.error('Error communicating with Gemini API:', geminiError);
-        res.status(500).json({ message: 'Error processing resume against job specifications', error: geminiError.message });
+        res.status(201).json({ message: 'Application submitted successfully', feedback: feedbackText });
+      } catch (apiError) {
+        console.error('Error generating feedback:', apiError);
+        res.status(500).json({ message: 'Error generating feedback', error: apiError.message });
       }
     });
+    
   } catch (err) {
     console.error('Error applying for job:', err);
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
-
 
 
 
@@ -189,6 +196,32 @@ app.get('/applicants/:id', async (req, res) => {
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
+
+app.get('/applicants/feedback/:id', async (req, res) => {
+  const applicantId = req.params.id;
+
+  // Check if the applicant ID is a valid MongoDB Object ID
+  if (!mongoose.Types.ObjectId.isValid(applicantId)) {
+    return res.status(400).json({ message: 'Invalid Applicant ID format' });
+  }
+
+  try {
+    // Find the applicant by ID
+    const applicant = await Applicant.findById(applicantId);
+    
+    // If applicant is not found, return a 404 error
+    if (!applicant) {
+      return res.status(404).json({ message: 'Applicant not found' });
+    }
+
+    // Return the feedback in the response
+    res.status(200).json({ feedback: applicant.feedback });
+  } catch (err) {
+    console.error('Error retrieving applicant feedback:', err);
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
 
 
 
@@ -364,7 +397,7 @@ app.post('/adminlogin', async (req, res) => {
   }
 });
 
-app.post('/jobcreation', async (req, res) => {  // Switch the order of req, res
+app.post('/jobcreation', async (req, res) => {  
   const {
     name,
     title,
@@ -394,16 +427,18 @@ app.post('/jobcreation', async (req, res) => {  // Switch the order of req, res
       employmentType, 
       requiredQualification,
       jobResponsibilities,
-      applicationDeadline
+      applicationDeadline,
+      published: false  // Set published to false by default
     });
 
     await newJob.save();
-    res.status(201).json({ message: 'Job creation successful', newJob });  
+    res.status(201).json({ message: 'Job creation successful', newJob });
   } catch (err) {
     console.error('Error creating job:', err);
-    res.status(500).json({ message: 'Server error', error: err.message });  
+    res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
+
 
 
 app.get('/jobcreation', async (req, res) => {

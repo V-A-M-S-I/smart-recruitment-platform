@@ -1,10 +1,10 @@
 import mongoose from 'mongoose';
 
 const jobSchema = new mongoose.Schema({
-  name:{
+  name: {
     type: String,
-    required: [true, 'Company name is required'], 
-    },
+    required: [true, 'Company name is required'],
+  },
   title: {
     type: String,
     required: [true, 'Job title is required'],
@@ -42,7 +42,8 @@ const jobSchema = new mongoose.Schema({
   jobResponsibilities: {
     type: String,
     required: [true, 'Job responsibilities are required'],
-  }
+  },
+  published: { type: Boolean, default: false }  
 });
 
 const Job = mongoose.model('Job', jobSchema);

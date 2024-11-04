@@ -14,6 +14,7 @@ import ApplicationForm from './components/applicationform.js';
 import Main from './components/main.js';
 import Adminogin from './AdminComponents/adminlogin.js';
 import ApplicantsList from './AdminComponents/applicantsData.js';
+import Feedback from './AdminComponents/feedback.js';
 
 function App() {
   return (
@@ -35,6 +36,7 @@ function App() {
           <Route path='/' element={<Main/>}/>
           <Route path='/adminlogin' element={<Adminogin />}/>
           <Route path="/applicants/:id" element={<ApplicantsList />} />
+          <Route path='/applicants/feedback/:id' element={<Feedback />} />
         </Routes>
       </div>
     </Router>

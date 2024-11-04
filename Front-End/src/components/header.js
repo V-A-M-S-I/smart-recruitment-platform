@@ -1,13 +1,21 @@
-// src/components/Header.js
-
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import '../Styles/header.css';
 
 const Header = () => {
   const [isOpen, setIsOpen] = useState(false);
+  const navigate = useNavigate();
 
   const toggleMenu = () => {
     setIsOpen(!isOpen);
+  };
+
+  const handleLogout = () => {
+  
+    localStorage.removeItem('token'); 
+    sessionStorage.removeItem('token'); 
+
+    navigate('/');
   };
 
   return (
@@ -23,7 +31,7 @@ const Header = () => {
         <a href="#contact" onClick={toggleMenu}>Contact</a>
       </nav>
 
-      <button className="logout-button">Logout</button>
+      <button className="logout-button" onClick={handleLogout}>Logout</button>
 
       <div className="hamburger" onClick={toggleMenu}>
         <span className={`bar ${isOpen ? 'open' : ''}`}></span>

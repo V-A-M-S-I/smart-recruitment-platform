@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import axios from 'axios';
 
 function ApplicantsList() {
@@ -32,6 +32,7 @@ function ApplicantsList() {
             <th style={{ padding: '8px', border: '1px solid #ddd' }}>Phone Number</th>
             <th style={{ padding: '8px', border: '1px solid #ddd' }}>Graduation Year</th>
             <th style={{ padding: '8px', border: '1px solid #ddd' }}>Resume</th>
+            <th style={{ padding: '8px', border: '1px solid #ddd' }}>Actions</th> {/* New column for actions */}
           </tr>
         </thead>
         <tbody>
@@ -49,10 +50,18 @@ function ApplicantsList() {
                   download 
                   target="_blank" 
                   rel="noopener noreferrer"
-                  style={{ textDecoration: 'none', color: 'white', backgroundColor: '#4CAF50', padding: '5px 10px', borderRadius: '4px' }}
+                  style={{ textDecoration: 'none', color: 'white', backgroundColor: '#4CAF50', padding: '5px 10px', borderRadius: '4px', marginRight: '5px' }}
                 >
                   Download
                 </a>
+              </td>
+              <td style={{ padding: '8px', border: '1px solid #ddd' }}>
+                <Link 
+                  to={`/applicants/feedback/${applicant._id}`} 
+                  style={{ textDecoration: 'none', color: 'white', backgroundColor: 'blue', padding: '5px 10px', borderRadius: '4px' }}
+                >
+                  Feedback
+                </Link>
               </td>
             </tr>
           ))}

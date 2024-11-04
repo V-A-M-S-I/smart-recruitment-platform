@@ -53,8 +53,12 @@ export default function JobCreation() {
         setPopupMessage('Data has been successfully saved!');
       }
       setShowPopup(true);
-      setTimeout(() => setShowPopup(false), 3000); // Hide popup after 3 seconds
-      navigate('/jobslist');
+      
+      // Show the popup message for 3 seconds, then navigate to /jobslist
+      setTimeout(() => {
+        setShowPopup(false);
+        navigate('/jobslist');
+      }, 3000);
     } catch (err) {
       console.error('Error saving job data:', err);
     }

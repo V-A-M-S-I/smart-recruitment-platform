@@ -35,9 +35,17 @@ const JobList = () => {
     }
   };
 
-  const handlePublish = (job) => {
-    navigate('/newjobs', { state: { job } });
+  const handlePublish = async (job) => {
+    try {
+      await axios.put(`http://localhost:8080/jobcreation/${job._id}`, { published: true }); // Update publish status in backend
+      alert("Job has been published to users!");
+      setJobs(jobs.map(j => j._id === job._id ? { ...j, published: true } : j)); // Update published status in frontend
+    } catch (err) {
+      console.error('Error publishing job:', err);
+      alert('Failed to publish job.');
+    }
   };
+  
 
   const handleApplicants = (jobId) => {
     navigate(`/applicants/${jobId}`); // Navigate to applicants page with job ID
