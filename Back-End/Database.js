@@ -1,6 +1,6 @@
 import express from 'express';
 import bodyParser from 'body-parser';
-import mongoose from 'mongoose';
+import mongoose, { Mongoose } from 'mongoose';
 import axios from 'axios';
 import cors from 'cors';
 import bcrypt, { compareSync } from 'bcrypt'; 
@@ -16,6 +16,7 @@ import Job from './Schemas/jobcreationSchema.js';
 import Applicant from './Schemas/applicationSchema.js';
 import Admin from './Schemas/adminloginSchema.js';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { getMaxListeners } from 'events';
 
 // Create __dirname in ES module environment
 const __filename = fileURLToPath(import.meta.url);
@@ -104,10 +105,10 @@ app.post('/applyjob/:id', upload.single('resume'), async (req, res) => {
       }
 
       const extractedText = data.pages.map(page => page.content.map(item => item.str).join(' ')).join('\n');
-
+      
       // Construct the prompt with both resume content and job details
       const prompt = `
-         compare and give  resume content, and the job details,and provide feeback whether applicant is suitable for the job are not give output as Eligible/NotEligible and resons for elible r not most important thing is consider every applicnat as fresher he does not requiure any exprirnce  :
+         compare and give  resume content, and the job details,and provide feeback whether applicant is suitable for the job are not give output as Eligible/NotEligible and resons for elible r not most important thing is consider every applicnat as fresher he does not requiure any exprirnce  first like of output shold be eligible r not later give feedback:
         
         **Resume Content:**
         "${extractedText}"
@@ -138,14 +139,18 @@ app.post('/applyjob/:id', upload.single('resume'), async (req, res) => {
         // Extract the feedback text from the response
         const feedbackText = response.response.candidates[0].content.parts[0].text;
         console.log(feedbackText);
-        
+        const eligibilityStatus = feedbackText.includes("Eligible") ? "Eligible" : "Not Eligible";
+
+        console.log(`Eligibility Status: ${eligibilityStatus}`);
+
         // Save applicant with the feedback received
         const newApplicant = new Applicant({
           firstname, lastname, email, phone, department, qualification,
           institute, graduationYear, skills, workExperience,
           resume: `http://localhost:8080/uploads/resumes/${req.file.filename}`,
           jobId: new mongoose.Types.ObjectId(jobId),
-          feedback: feedbackText, // Use the feedback text from the API
+          feedback: feedbackText, 
+          status: eligibilityStatus,
         });
 
         await newApplicant.save();
@@ -161,16 +166,6 @@ app.post('/applyjob/:id', upload.single('resume'), async (req, res) => {
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -221,6 +216,59 @@ app.get('/applicants/feedback/:id', async (req, res) => {
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
+
+
+app.post('/send-mail-to-applicants/:id', async (req, res) => {
+  const { id } = req.params;
+
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    return res.status(400).json({ message: 'Invalid job ID format' });
+  }
+
+  try {
+    // Fetch all applicants for the given job ID
+    const applicants = await Applicant.find({ jobId: id });
+  
+    if (applicants.length === 0) {
+      return res.status(404).json({ message: 'No applicants found for this job.' });
+    }
+  
+    // Check if the job exists
+    const jobExists = await Job.findById(id);
+    if (!jobExists) {
+      return res.status(404).json({ message: 'Job not found' });
+    }
+  
+    // Extract job details
+    const { title, name } = jobExists;
+  
+    // Loop through each applicant and send an email
+    const emailPromises = applicants.map(applicant => {
+      const message = applicant.status === 'Eligible'
+        ? `Dear ${applicant.firstname} ${applicant.lastname},\n\nCongratulations! You have been shortlisted for the next round for the position of ${title} at ${name}. We will send you the details of the next steps within a few days.\n\nBest regards,\n${name} Recruitment Team`
+        : `Dear ${applicant.firstname} ${applicant.lastname},\n\nThank you for applying for the ${title} position at ${name}. Although you were not shortlisted for the next round, we encourage you to keep developing your skills and consider applying for future opportunities with us. We wish you all the best in your career journey.\n\nBest regards,\n${name} Recruitment Team`;
+  
+      const mailOptions = {
+        from: 'campustocorpate@veltech.edu.in',
+        to: applicant.email,
+        subject: `Application Status for Job: ${title} at ${name}`,
+        text: message
+      };
+  
+      return transporter.sendMail(mailOptions);
+    });
+  
+    // Send all emails
+    await Promise.all(emailPromises);
+    res.status(200).json({ message: 'Emails sent successfully to all applicants.' });
+  } catch (error) {
+    console.error('Error sending emails:', error);
+    res.status(500).json({ message: 'Failed to send emails to applicants.' });
+  }
+  
+});
+
+
 
 
 

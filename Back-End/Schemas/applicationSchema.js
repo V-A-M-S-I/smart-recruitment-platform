@@ -13,7 +13,8 @@ const applicantSchema = new mongoose.Schema({
   workExperience: { type: String, default: '' },
   resume: { type: String, required: true },
   jobId: { type: mongoose.Schema.Types.ObjectId, ref: 'Job', required: true },
-  feedback: { type: String } 
+  feedback: { type: String } ,
+  status:{type:String}
 }, { timestamps: true });
 
 const Applicant = mongoose.model('Applicant', applicantSchema);

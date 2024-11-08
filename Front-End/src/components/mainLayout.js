@@ -22,10 +22,7 @@ const MainLayout = () => {
 
       
     </main>
-    <img 
-        src='https://media.istockphoto.com/id/1394520456/photo/we-are-hiring-text-on-notepad-and-magnifying-glass-on-blue-background.jpg?s=612x612&w=0&k=20&c=5TXWF0FeFaJjOp0CgXU1ysN4jzXOQduJliVevkhpQL0=' 
-        alt='hiring' className='job' 
-      />
+    
     </>
   );
 };

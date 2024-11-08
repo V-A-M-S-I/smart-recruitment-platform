@@ -19,6 +19,16 @@ function ApplicantsList() {
     fetchApplicants();
   }, [id]);
 
+  const sendMailToAllApplicants = async () => {
+    try {
+      await axios.post(`http://localhost:8080/send-mail-to-applicants/${id}`);
+      alert('Emails sent successfully to all applicants.');
+    } catch (error) {
+      console.error('Error sending emails:', error);
+      alert('Failed to send emails to applicants.');
+    }
+  };
+
   return (
     <div>
       <h1>Applicants for Job ID: {id}</h1>
@@ -32,7 +42,8 @@ function ApplicantsList() {
             <th style={{ padding: '8px', border: '1px solid #ddd' }}>Phone Number</th>
             <th style={{ padding: '8px', border: '1px solid #ddd' }}>Graduation Year</th>
             <th style={{ padding: '8px', border: '1px solid #ddd' }}>Resume</th>
-            <th style={{ padding: '8px', border: '1px solid #ddd' }}>Actions</th> {/* New column for actions */}
+            <th style={{ padding: '8px', border: '1px solid #ddd' }}>Feedback</th>
+            <th style={{ padding: '8px', border: '1px solid #ddd' }}>Status</th>
           </tr>
         </thead>
         <tbody>
@@ -50,7 +61,7 @@ function ApplicantsList() {
                   download 
                   target="_blank" 
                   rel="noopener noreferrer"
-                  style={{ textDecoration: 'none', color: 'white', backgroundColor: '#4CAF50', padding: '5px 10px', borderRadius: '4px', marginRight: '5px' }}
+                  style={{ textDecoration: 'none', color: 'white', backgroundColor: '#4CAF50', padding: '5px 10px', borderRadius: '4px' }}
                 >
                   Download
                 </a>
@@ -63,10 +74,35 @@ function ApplicantsList() {
                   Feedback
                 </Link>
               </td>
+              <td 
+                style={{ 
+                  padding: '8px', 
+                  border: '1px solid #ddd', 
+                  color: applicant.status === 'Eligible' ? 'green' : 'red' 
+                }}
+              >
+                {applicant.status}
+              </td>
             </tr>
           ))}
         </tbody>
       </table>
+
+      {/* Send Mail Button outside the table, applying to all applicants */}
+      <button 
+        onClick={sendMailToAllApplicants}
+        style={{ 
+          marginTop: '10px', 
+          padding: '10px 20px', 
+          backgroundColor: '#007BFF', 
+          color: 'white', 
+          border: 'none', 
+          borderRadius: '4px', 
+          cursor: 'pointer' 
+        }}
+      >
+        Send Mail to All Applicants
+      </button>
     </div>
   );
 }
